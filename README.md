@@ -27,6 +27,8 @@ The app includes responsive Grid and Flexbox layouts, a gradient background, a s
 
 ## Deployment
 
-GitHub Pages can host the frontend but cannot run the server endpoint. Deploy `server/news.js` as a Cloudflare Worker (its default export is a Worker fetch handler), set its secret `WORLD_NEWS_API_KEY`, and set `ALLOWED_ORIGIN` to the exact GitHub Pages origin. Configure the repository Actions variable `VITE_NEWS_API_URL` with that Worker URL. Before public deployment, configure rate limits on the endpoint to protect the shared free quota. The included Pages workflow builds the frontend using this URL; no API key belongs in the Pages build.
+GitHub Pages hosts the frontend. The news API runs on Railway with `npm start`, which launches `server/listen.js`. That server calls `server/news.js`. `WORLD_NEWS_API_KEY` and `ALLOWED_ORIGIN` stay on Railway. The Pages build reads the Actions variable `VITE_NEWS_API_URL`. No API key belongs in the Pages build.
 
-**Deployment URL:** Pending deployment to the assignment repository and hosting of the API endpoint.
+**API:** https://generic-api-based-billng2801-production.up.railway.app/api/news
+
+**Deployment URL:** https://lmu-cmsi2021-fall2026.github.io/generic-api-based-BillNg2801/
