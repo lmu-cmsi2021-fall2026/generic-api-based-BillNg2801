@@ -8,6 +8,7 @@ import {
   filterEdition,
   handleCachedNews,
   refreshIfDue,
+  refreshOnDemand,
   shouldAttempt,
   writeEdition,
 } from "./edition.js";
@@ -83,6 +84,35 @@ test("a due edition is pulled once and then served", async () => {
     assert.equal(response.status, 200);
     assert.equal(body.news.length, 1);
     assert.equal(body.available, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual refresh stops after ten pulls", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "frame-news-"));
+  const env = {
+    NEWS_CACHE_PATH: path.join(dir, "news.json"),
+    WORLD_NEWS_API_KEY: "test",
+  };
+  let pulls = 0;
+  try {
+    for (let index = 0; index < 10; index += 1) {
+      const result = await refreshOnDemand(env, morning, async () => {
+        pulls += 1;
+        return [
+          { id: pulls, title: `Anthropic update ${pulls}`, summary: "AI" },
+        ];
+      });
+      assert.equal(result.refreshesLeft, 9 - index);
+    }
+    const blocked = await refreshOnDemand(env, morning, async () => {
+      pulls += 1;
+      return [{ id: 99, title: "Should not run", summary: "AI" }];
+    });
+    assert.equal(blocked.limited, true);
+    assert.equal(blocked.refreshesLeft, 0);
+    assert.equal(pulls, 10);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

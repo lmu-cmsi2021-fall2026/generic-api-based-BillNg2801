@@ -80,13 +80,21 @@ export function normalizeNews(data) {
   };
 }
 
-export async function fetchNews({ section, topic, search, page, signal }) {
+export async function fetchNews({
+  section,
+  topic,
+  search,
+  page,
+  signal,
+  refresh,
+}) {
   const endpoint =
     import.meta.env.VITE_NEWS_API_URL || `${import.meta.env.BASE_URL}api/news`;
   const params = new URLSearchParams({
     text: buildQuery(section, topic, search),
     offset: page || "0",
   });
+  if (refresh) params.set("refresh", "1");
   let response;
   try {
     response = await fetch(`${endpoint}?${params}`, {
@@ -108,11 +116,17 @@ export async function fetchNews({ section, topic, search, page, signal }) {
       "The news endpoint is unavailable. Please check the server configuration.",
     );
   }
-  if (!response.ok)
-    throw new Error(data.message || "News is temporarily unavailable.");
+  if (!response.ok) {
+    const failure = new Error(
+      data.message || "News is temporarily unavailable.",
+    );
+    failure.refreshesLeft = data.refreshesLeft;
+    throw failure;
+  }
   const result = normalizeNews(data);
   result.articles = result.articles.filter((article) =>
     isRelevantArticle(article, section, topic),
   );
+  result.refreshesLeft = data.refreshesLeft;
   return result;
 }

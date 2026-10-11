@@ -63,6 +63,18 @@ export function shouldAttempt(savedEdition, now) {
   return true;
 }
 
+export const DAILY_REFRESH_CAP = 10;
+
+export function quotaDay(now) {
+  return now.toISOString().slice(0, 10);
+}
+
+export function refreshesRemaining(saved, now) {
+  const count =
+    saved?.refreshDay === quotaDay(now) ? Number(saved.refreshCount) || 0 : 0;
+  return Math.max(0, DAILY_REFRESH_CAP - count);
+}
+
 export function filterEdition(news, text) {
   const raw = text.trim().toLowerCase();
   let extra = "";
@@ -122,6 +134,64 @@ export async function fetchEdition(env) {
 }
 
 let refreshTask = null;
+let manualTask = null;
+
+export async function refreshOnDemand(
+  env = process.env,
+  now = new Date(),
+  fetchNews = fetchEdition,
+) {
+  if (!manualTask) {
+    manualTask = (async () => {
+      const saved = await readEdition(env);
+      const left = refreshesRemaining(saved, now);
+      if (left <= 0) return { saved, limited: true, refreshesLeft: 0 };
+      try {
+        if (!env.WORLD_NEWS_API_KEY) {
+          return {
+            saved,
+            refreshesLeft: left,
+            error: "The news service key is not configured.",
+          };
+        }
+        const news = await fetchNews(env);
+        if (!news?.length) {
+          return {
+            saved,
+            refreshesLeft: left,
+            error: "No stories came back. Please try again.",
+          };
+        }
+        const edition = {
+          edition: saved?.edition || editionKey(now),
+          news: news.slice(0, 20),
+          refreshDay: quotaDay(now),
+          refreshCount:
+            (saved?.refreshDay === quotaDay(now)
+              ? Number(saved.refreshCount) || 0
+              : 0) + 1,
+        };
+        await writeEdition(env, edition);
+        return {
+          saved: edition,
+          refreshesLeft: DAILY_REFRESH_CAP - edition.refreshCount,
+        };
+      } catch (error) {
+        return {
+          saved,
+          refreshesLeft: left,
+          error:
+            error.status === 402 || error.status === 429
+              ? "The free daily news allowance has been reached. Please try again tomorrow."
+              : "The news service could not refresh. Please try again.",
+        };
+      } finally {
+        manualTask = null;
+      }
+    })();
+  }
+  return manualTask;
+}
 
 export async function refreshIfDue(
   env = process.env,
@@ -136,7 +206,12 @@ export async function refreshIfDue(
         if (!env.WORLD_NEWS_API_KEY) return await readEdition(env);
         const news = await fetchNews(env);
         if (!news?.length) return await readEdition(env);
-        const edition = { edition: editionKey(now), news: news.slice(0, 20) };
+        const edition = {
+          edition: editionKey(now),
+          news: news.slice(0, 20),
+          refreshDay: saved?.refreshDay,
+          refreshCount: saved?.refreshCount || 0,
+        };
         await writeEdition(env, edition);
         return edition;
       } catch {
@@ -180,13 +255,59 @@ export async function handleCachedNews(request, env = process.env) {
     offset > 1000
   )
     return reply({ message: "Invalid search parameters." }, 400);
-  if (offset > 0) return reply({ news: [], offset: 0, available: 0 });
+  if (offset > 0)
+    return reply({
+      news: [],
+      offset: 0,
+      available: 0,
+      refreshesLeft: DAILY_REFRESH_CAP,
+    });
+  if (input.get("refresh") === "1") {
+    const result = await refreshOnDemand(env);
+    const savedNews = result.saved?.news || [];
+    if (result.error && !savedNews.length)
+      return reply(
+        { message: result.error, refreshesLeft: result.refreshesLeft },
+        result.limited ? 429 : 503,
+      );
+    if (result.error)
+      return reply(
+        {
+          message: result.error,
+          news: filterEdition(savedNews, text),
+          refreshesLeft: result.refreshesLeft,
+        },
+        503,
+      );
+    if (!savedNews.length)
+      return reply(
+        {
+          message: result.limited
+            ? "Today's 10 refreshes have been used."
+            : "Today's 20 stories publish at 5:30 PM Pacific.",
+          refreshesLeft: result.refreshesLeft,
+        },
+        result.limited ? 429 : 503,
+      );
+    const news = filterEdition(savedNews, text);
+    return reply({
+      news,
+      offset: 0,
+      available: news.length,
+      refreshesLeft: result.refreshesLeft,
+      limited: result.limited || false,
+    });
+  }
   const saved = await refreshIfDue(env);
+  const refreshesLeft = refreshesRemaining(saved, new Date());
   if (!saved?.news?.length)
     return reply(
-      { message: "Today's 20 stories publish at 5:30 PM Pacific." },
+      {
+        message: "Today's 20 stories publish at 5:30 PM Pacific.",
+        refreshesLeft,
+      },
       503,
     );
   const news = filterEdition(saved.news, text);
-  return reply({ news, offset: 0, available: news.length });
+  return reply({ news, offset: 0, available: news.length, refreshesLeft });
 }

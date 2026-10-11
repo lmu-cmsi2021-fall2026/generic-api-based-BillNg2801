@@ -148,6 +148,17 @@ input:focus-visible {
 .feed-column {
   min-width: 0;
 }
+.refresh-feed {
+  display: inline-flex;
+  margin: 0 0 16px;
+  background: #245cce;
+  color: white;
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
 .feed-heading .nav-label {
   color: #2563eb;
   margin-bottom: 9px;

@@ -103,6 +103,8 @@ export default function App() {
   const [articles, setArticles] = useState([]);
   const [nextPage, setNextPage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshesLeft, setRefreshesLeft] = useState(10);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const controller = useRef(null);
@@ -135,8 +137,13 @@ export default function App() {
         if (abort.signal.aborted) return;
         setArticles(mergeStories([], result.articles));
         setNextPage(result.nextPage);
+        if (Number.isInteger(result.refreshesLeft))
+          setRefreshesLeft(result.refreshesLeft);
       } catch (failure) {
-        if (!abort.signal.aborted) setError(failure.message);
+        if (abort.signal.aborted) return;
+        setError(failure.message);
+        if (Number.isInteger(failure.refreshesLeft))
+          setRefreshesLeft(failure.refreshesLeft);
       } finally {
         if (!abort.signal.aborted) setLoading(false);
       }
@@ -147,6 +154,30 @@ export default function App() {
       controller.current?.abort();
     };
   }, [section, topic, search, revision]);
+
+  async function refreshFeed() {
+    if (refreshing || refreshesLeft <= 0) return;
+    setRefreshing(true);
+    setError("");
+    try {
+      const result = await fetchNews({
+        section,
+        topic,
+        search,
+        refresh: true,
+      });
+      setArticles(mergeStories([], result.articles));
+      setNextPage(result.nextPage);
+      if (Number.isInteger(result.refreshesLeft))
+        setRefreshesLeft(result.refreshesLeft);
+    } catch (failure) {
+      setError(failure.message);
+      if (Number.isInteger(failure.refreshesLeft))
+        setRefreshesLeft(failure.refreshesLeft);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   function changeSection(value) {
     closeMenu();
@@ -283,6 +314,17 @@ export default function App() {
       </dialog>
       <main className="feed-layout">
         <section id="news" className="feed-column" aria-labelledby="feed-title">
+          <button
+            className="refresh-feed"
+            disabled={refreshing || refreshesLeft <= 0}
+            onClick={refreshFeed}
+          >
+            {refreshing
+              ? "Refreshing…"
+              : refreshesLeft <= 0
+                ? "Refresh used today"
+                : "Refresh feed"}
+          </button>
           <div className="feed-heading">
             <p className="nav-label">THE LATEST</p>
             <h1 id="feed-title">
