@@ -314,17 +314,6 @@ export default function App() {
       </dialog>
       <main className="feed-layout">
         <section id="news" className="feed-column" aria-labelledby="feed-title">
-          <button
-            className="refresh-feed"
-            disabled={refreshing || refreshesLeft <= 0}
-            onClick={refreshFeed}
-          >
-            {refreshing
-              ? "Refreshing…"
-              : refreshesLeft <= 0
-                ? "Refresh used today"
-                : "Refresh feed"}
-          </button>
           <div className="feed-heading">
             <p className="nav-label">THE LATEST</p>
             <h1 id="feed-title">
@@ -394,6 +383,17 @@ export default function App() {
             </div>
           )}
 
+          <button
+            className="refresh-feed"
+            disabled={refreshing || refreshesLeft <= 0}
+            onClick={refreshFeed}
+          >
+            {refreshing
+              ? "Refreshing…"
+              : refreshesLeft <= 0
+                ? "Refresh used today"
+                : "Refresh feed"}
+          </button>
           <div className="posts" aria-busy={loading}>
             {uniqueArticles.map((article, index) => (
               <ArticleCard
