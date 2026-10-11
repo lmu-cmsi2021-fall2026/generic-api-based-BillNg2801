@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { handleNews } from "./news.js";
+import { handleCachedNews, startEditionScheduler } from "./edition.js";
 
 const port = Number(process.env.PORT) || 8080;
 
@@ -20,7 +20,7 @@ const server = createServer(async (req, res) => {
   }
   try {
     const request = new Request(url, { method: req.method });
-    const response = await handleNews(request, process.env);
+    const response = await handleCachedNews(request, process.env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
   } catch {
@@ -29,4 +29,5 @@ const server = createServer(async (req, res) => {
   }
 });
 
+startEditionScheduler(process.env);
 server.listen(port, "0.0.0.0");

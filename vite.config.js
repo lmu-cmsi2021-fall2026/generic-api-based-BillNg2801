@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { handleNews } from "./server/news.js";
+import { handleCachedNews } from "./server/edition.js";
 
 export default defineConfig(({ mode }) => {
   const env = { ...process.env, ...loadEnv(mode, process.cwd(), "") };
@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
       const request = new Request(`http://127.0.0.1${req.url}`, {
         method: req.method,
       });
-      const response = await handleNews(request, env);
+      const response = await handleCachedNews(request, env);
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(await response.text());
     });

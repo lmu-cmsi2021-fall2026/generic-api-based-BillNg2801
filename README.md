@@ -12,7 +12,7 @@ Vite provides a local `/api/news` server endpoint. The key stays on the server a
 
 ## Data and behavior
 
-[World News API documentation](https://worldnewsapi.com/docs/search-news/) describes the search endpoint. The free plan uses a 50-point daily allowance; searches and pagination consume points. Article bodies, images, summaries, source URLs, and publication dates are normalized in `src/api.js`. All browser network calls are exported async functions in that non-React module. `server/news.js` handles the authenticated upstream request, validation, timeouts, and safe errors.
+[World News API documentation](https://worldnewsapi.com/docs/search-news/) describes the search endpoint. The free plan allows 50 points per day and resets at midnight UTC. The server pulls 20 stories once each day at 5:30 PM Pacific, stores that edition, and serves it until the next refresh. Visits, search, and reloads read the saved edition and do not call the API. Article bodies, images, summaries, source URLs, and publication dates are normalized in `src/api.js`. All browser network calls are exported async functions in that non-React module. `server/edition.js` stores the edition and `server/news.js` remains the direct request helper.
 
 Posts use up to 100 words of article text for their preview and up to 300 words for expanded sentence bullets. These are excerpts, not generated summaries. Short articles remain short. Likely duplicate stories are grouped across pages; this heuristic cannot guarantee perfect event matching. No persistent article cache is used.
 
